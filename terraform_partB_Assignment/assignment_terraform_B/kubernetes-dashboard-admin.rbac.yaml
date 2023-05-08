@@ -14,7 +14,7 @@ items:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: Atul Sharma
+  name: admin-user
   namespace: kube-system
 
 ---
@@ -29,5 +29,5 @@ roleRef:
   name: cluster-admin
 subjects:
 - kind: ServiceAccount
-  name: Atul Sharma
+  name: admin-user
   namespace: kube-system

@@ -13,7 +13,8 @@ data "google_container_cluster" "mycluster" {
   ]
 }
 
-data "google_service_account" "object_viewer" {
+data "google_service_account" "this" {
   account_id = "111141078973693471686"
+  display_name = "terraform_sa"
 }
 

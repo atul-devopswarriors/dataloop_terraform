@@ -17,7 +17,7 @@ resource "google_container_node_pool" "master_pool" {
   node_count = var.gke_num_nodes
 
   node_config {
-   service_account = "terraform-sa@dataloop-candidate-environment.iam.gserviceaccount.com"
+   service_account = data.google_service_account.this.email
    oauth_scopes = [
       "https://www.googleapis.com/auth/logging.write",
       "https://www.googleapis.com/auth/monitoring"
