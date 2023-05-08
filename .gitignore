@@ -4,6 +4,7 @@
 *.tfstate.lock.info*.terraform.lock.hcl
 # logs
 *.log
+providers.tf
 
 # Directories
 .terraform/
