@@ -21,7 +21,7 @@ spec:
         message: >-
           Pod/{{ request.object.metadata.name }} denied:
           container '{{ element.name }}' has effective runAsUser
-          '{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `unset` }}';
+          '{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}';
           required: >= 1000.
         foreach:
           - list: "request.object.spec.containers[]"
@@ -45,7 +45,7 @@ spec:
         message: >-
           Pod/{{ request.object.metadata.name }} denied:
           initContainer '{{ element.name }}' has effective runAsUser
-          '{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `unset` }}';
+          '{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}';
           required: >= 1000.
         foreach:
           - list: "request.object.spec.initContainers || `[]`"
@@ -74,7 +74,7 @@ spec:
         message: >-
           {{ request.object.kind }}/{{ request.object.metadata.name }} denied:
           container '{{ element.name }}' has effective runAsUser
-          '{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `unset` }}';
+          '{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0` }}';
           required: >= 1000.
         foreach:
           - list: "request.object.spec.template.spec.containers[]"
@@ -103,7 +103,7 @@ spec:
         message: >-
           {{ request.object.kind }}/{{ request.object.metadata.name }} denied:
           initContainer '{{ element.name }}' has effective runAsUser
-          '{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `unset` }}';
+          '{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0` }}';
           required: >= 1000.
         foreach:
           - list: "request.object.spec.template.spec.initContainers || `[]`"
@@ -127,7 +127,7 @@ spec:
         message: >-
           CronJob/{{ request.object.metadata.name }} denied:
           container '{{ element.name }}' has effective runAsUser
-          '{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `unset` }}';
+          '{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0` }}';
           required: >= 1000.
         foreach:
           - list: "request.object.spec.jobTemplate.spec.template.spec.containers[]"
@@ -151,7 +151,7 @@ spec:
         message: >-
           CronJob/{{ request.object.metadata.name }} denied:
           initContainer '{{ element.name }}' has effective runAsUser
-          '{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `unset` }}';
+          '{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0` }}';
           required: >= 1000.
         foreach:
           - list: "request.object.spec.jobTemplate.spec.template.spec.initContainers || `[]`"
