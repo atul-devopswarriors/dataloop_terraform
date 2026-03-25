@@ -1,0 +1,176 @@
+apiVersion: kyverno.io/v1
+kind: Policy
+metadata:
+  name: require-runasuser-gte-1000
+  namespace: quartz1
+spec:
+  validationFailureAction: Enforce
+  background: false
+  failurePolicy: Fail
+  rules:
+    - name: pods-containers-require-runasuser-gte-1000
+      match:
+        any:
+          - resources:
+              operations:
+                - CREATE
+                - UPDATE
+              kinds:
+                - Pod
+      validate:
+        message: >-
+          Pod/{{ request.object.metadata.name }} denied. Offending containers:
+          {{ request.object.spec.containers[?((securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0`) < `1000`)].name }}.
+          Effective runAsUser must be >= 1000.
+        foreach:
+          - list: "request.object.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+    - name: pods-initcontainers-require-runasuser-gte-1000
+      match:
+        any:
+          - resources:
+              operations:
+                - CREATE
+                - UPDATE
+              kinds:
+                - Pod
+      validate:
+        message: >-
+          Pod/{{ request.object.metadata.name }} denied. Offending initContainers:
+          {{ (request.object.spec.initContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0`) < `1000`)].name }}.
+          Effective runAsUser must be >= 1000.
+        foreach:
+          - list: "request.object.spec.initContainers || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+    - name: pods-ephemeralcontainers-require-runasuser-gte-1000
+      match:
+        any:
+          - resources:
+              operations:
+                - CREATE
+                - UPDATE
+              kinds:
+                - Pod
+      validate:
+        message: >-
+          Pod/{{ request.object.metadata.name }} denied. Offending ephemeralContainers:
+          {{ (request.object.spec.ephemeralContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0`) < `1000`)].name }}.
+          Effective runAsUser must be >= 1000.
+        foreach:
+          - list: "request.object.spec.ephemeralContainers || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+    - name: workload-templates-containers-require-runasuser-gte-1000
+      match:
+        any:
+          - resources:
+              operations:
+                - CREATE
+                - UPDATE
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - ReplicaSet
+                - ReplicationController
+                - Job
+      validate:
+        message: >-
+          {{ request.object.kind }}/{{ request.object.metadata.name }} denied.
+          Offending containers:
+          {{ request.object.spec.template.spec.containers[?((securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)].name }}.
+          Effective runAsUser must be >= 1000.
+        foreach:
+          - list: "request.object.spec.template.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+    - name: workload-templates-initcontainers-require-runasuser-gte-1000
+      match:
+        any:
+          - resources:
+              operations:
+                - CREATE
+                - UPDATE
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - ReplicaSet
+                - ReplicationController
+                - Job
+      validate:
+        message: >-
+          {{ request.object.kind }}/{{ request.object.metadata.name }} denied.
+          Offending initContainers:
+          {{ (request.object.spec.template.spec.initContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)].name }}.
+          Effective runAsUser must be >= 1000.
+        foreach:
+          - list: "request.object.spec.template.spec.initContainers || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+    - name: cronjob-templates-containers-require-runasuser-gte-1000
+      match:
+        any:
+          - resources:
+              operations:
+                - CREATE
+                - UPDATE
+              kinds:
+                - CronJob
+      validate:
+        message: >-
+          CronJob/{{ request.object.metadata.name }} denied. Offending containers:
+          {{ request.object.spec.jobTemplate.spec.template.spec.containers[?((securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)].name }}.
+          Effective runAsUser must be >= 1000.
+        foreach:
+          - list: "request.object.spec.jobTemplate.spec.template.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+    - name: cronjob-templates-initcontainers-require-runasuser-gte-1000
+      match:
+        any:
+          - resources:
+              operations:
+                - CREATE
+                - UPDATE
+              kinds:
+                - CronJob
+      validate:
+        message: >-
+          CronJob/{{ request.object.metadata.name }} denied. Offending initContainers:
+          {{ (request.object.spec.jobTemplate.spec.template.spec.initContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)].name }}.
+          Effective runAsUser must be >= 1000.
+        foreach:
+          - list: "request.object.spec.jobTemplate.spec.template.spec.initContainers || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
