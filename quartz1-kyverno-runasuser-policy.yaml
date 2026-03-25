@@ -1,0 +1,112 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: quartz1-require-runasuser-gte-1000
+spec:
+  validationFailureAction: Enforce
+  background: true
+  failurePolicy: Fail
+  rules:
+    - name: pods-require-runasuser-gte-1000
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - quartz1
+      validate:
+        message: "Each container (including init/ephemeral) must have an effective runAsUser >= 1000."
+        foreach:
+          - list: "request.object.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+          - list: "request.object.spec.initContainers || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+          - list: "request.object.spec.ephemeralContainers || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+
+    - name: workload-templates-require-runasuser-gte-1000
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - ReplicaSet
+                - ReplicationController
+                - Job
+              namespaces:
+                - quartz1
+      validate:
+        message: "Workload pod templates must set effective runAsUser >= 1000 for all containers and initContainers."
+        foreach:
+          - list: "request.object.spec.template.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+          - list: "request.object.spec.template.spec.initContainers || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+          - list: "request.object.spec.template.spec.ephemeralContainers || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+
+    - name: cronjob-templates-require-runasuser-gte-1000
+      match:
+        any:
+          - resources:
+              kinds:
+                - CronJob
+              namespaces:
+                - quartz1
+      validate:
+        message: "CronJob pod templates must set effective runAsUser >= 1000 for all containers and initContainers."
+        foreach:
+          - list: "request.object.spec.jobTemplate.spec.template.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+          - list: "request.object.spec.jobTemplate.spec.template.spec.initContainers || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
+          - list: "request.object.spec.jobTemplate.spec.template.spec.ephemeralContainers || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0` }}"
+                    operator: LessThan
+                    value: 1000
