@@ -5,48 +5,45 @@ metadata:
   namespace: quartz1
 spec:
   validationFailureAction: Enforce
-  background: true
+  background: false
   failurePolicy: Fail
   rules:
     - name: pods-require-runasuser-gte-1000
       match:
         any:
           - resources:
+              operations:
+                - CREATE
+                - UPDATE
               kinds:
                 - Pod
       validate:
         message: >-
-          Pod {{ request.object.metadata.name }}: container/initContainer
-          '{{ element.name }}' has effective runAsUser
-          '{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `unset` }}';
-          required: >= 1000.
-        foreach:
-          - list: "request.object.spec.containers[]"
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}"
-                    operator: LessThan
-                    value: 1000
-          - list: "request.object.spec.initContainers || `[]`"
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}"
-                    operator: LessThan
-                    value: 1000
-          - list: "request.object.spec.ephemeralContainers || `[]`"
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0` }}"
-                    operator: LessThan
-                    value: 1000
+          Pod/{{ request.object.metadata.name }} denied. Offending containers
+          (runAsUser unset or <1000):
+          containers=[{{ request.object.spec.containers[?((securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0`) < `1000`)].name | join(', ', @) }}],
+          initContainers=[{{ (request.object.spec.initContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0`) < `1000`)].name | join(', ', @) }}],
+          ephemeralContainers=[{{ (request.object.spec.ephemeralContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0`) < `1000`)].name | join(', ', @) }}].
+        deny:
+          conditions:
+            any:
+              - key: "{{ length(request.object.spec.containers[?((securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0`) < `1000`)]) }}"
+                operator: GreaterThan
+                value: 0
+              - key: "{{ length((request.object.spec.initContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0`) < `1000`)]) }}"
+                operator: GreaterThan
+                value: 0
+              - key: "{{ length((request.object.spec.ephemeralContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `0`) < `1000`)]) }}"
+                operator: GreaterThan
+                value: 0
 
     - name: workload-templates-require-runasuser-gte-1000
       match:
         any:
           - resources:
+              operations:
+                - CREATE
+                - UPDATE
               kinds:
                 - Deployment
                 - StatefulSet
@@ -56,64 +53,49 @@ spec:
                 - Job
       validate:
         message: >-
-          {{ request.object.kind }}/{{ request.object.metadata.name }} template:
-          container/initContainer '{{ element.name }}' has effective runAsUser
-          '{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `unset` }}';
-          required: >= 1000.
-        foreach:
-          - list: "request.object.spec.template.spec.containers[]"
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0` }}"
-                    operator: LessThan
-                    value: 1000
-          - list: "request.object.spec.template.spec.initContainers || `[]`"
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0` }}"
-                    operator: LessThan
-                    value: 1000
-          - list: "request.object.spec.template.spec.ephemeralContainers || `[]`"
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0` }}"
-                    operator: LessThan
-                    value: 1000
+          {{ request.object.kind }}/{{ request.object.metadata.name }} denied.
+          Offending pod-template containers (runAsUser unset or <1000):
+          containers=[{{ request.object.spec.template.spec.containers[?((securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)].name | join(', ', @) }}],
+          initContainers=[{{ (request.object.spec.template.spec.initContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)].name | join(', ', @) }}],
+          ephemeralContainers=[{{ (request.object.spec.template.spec.ephemeralContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)].name | join(', ', @) }}].
+        deny:
+          conditions:
+            any:
+              - key: "{{ length(request.object.spec.template.spec.containers[?((securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)]) }}"
+                operator: GreaterThan
+                value: 0
+              - key: "{{ length((request.object.spec.template.spec.initContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)]) }}"
+                operator: GreaterThan
+                value: 0
+              - key: "{{ length((request.object.spec.template.spec.ephemeralContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)]) }}"
+                operator: GreaterThan
+                value: 0
 
     - name: cronjob-templates-require-runasuser-gte-1000
       match:
         any:
           - resources:
+              operations:
+                - CREATE
+                - UPDATE
               kinds:
                 - CronJob
       validate:
         message: >-
-          CronJob/{{ request.object.metadata.name }} template:
-          container/initContainer '{{ element.name }}' has effective runAsUser
-          '{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `unset` }}';
-          required: >= 1000.
-        foreach:
-          - list: "request.object.spec.jobTemplate.spec.template.spec.containers[]"
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0` }}"
-                    operator: LessThan
-                    value: 1000
-          - list: "request.object.spec.jobTemplate.spec.template.spec.initContainers || `[]`"
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0` }}"
-                    operator: LessThan
-                    value: 1000
-          - list: "request.object.spec.jobTemplate.spec.template.spec.ephemeralContainers || `[]`"
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0` }}"
-                    operator: LessThan
-                    value: 1000
+          CronJob/{{ request.object.metadata.name }} denied. Offending
+          pod-template containers (runAsUser unset or <1000):
+          containers=[{{ request.object.spec.jobTemplate.spec.template.spec.containers[?((securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)].name | join(', ', @) }}],
+          initContainers=[{{ (request.object.spec.jobTemplate.spec.template.spec.initContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)].name | join(', ', @) }}],
+          ephemeralContainers=[{{ (request.object.spec.jobTemplate.spec.template.spec.ephemeralContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)].name | join(', ', @) }}].
+        deny:
+          conditions:
+            any:
+              - key: "{{ length(request.object.spec.jobTemplate.spec.template.spec.containers[?((securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)]) }}"
+                operator: GreaterThan
+                value: 0
+              - key: "{{ length((request.object.spec.jobTemplate.spec.template.spec.initContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)]) }}"
+                operator: GreaterThan
+                value: 0
+              - key: "{{ length((request.object.spec.jobTemplate.spec.template.spec.ephemeralContainers || `[]`)[?((securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `0`) < `1000`)]) }}"
+                operator: GreaterThan
+                value: 0
