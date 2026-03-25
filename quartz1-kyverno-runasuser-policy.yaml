@@ -1,7 +1,8 @@
 apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+kind: Policy
 metadata:
-  name: quartz1-require-runasuser-gte-1000
+  name: require-runasuser-gte-1000
+  namespace: quartz1
 spec:
   validationFailureAction: Enforce
   background: true
@@ -13,10 +14,12 @@ spec:
           - resources:
               kinds:
                 - Pod
-              namespaces:
-                - quartz1
       validate:
-        message: "Each container (including init/ephemeral) must have an effective runAsUser >= 1000."
+        message: >-
+          Pod {{ request.object.metadata.name }}: container/initContainer
+          '{{ element.name }}' has effective runAsUser
+          '{{ element.securityContext.runAsUser || request.object.spec.securityContext.runAsUser || `unset` }}';
+          required: >= 1000.
         foreach:
           - list: "request.object.spec.containers[]"
             deny:
@@ -51,10 +54,12 @@ spec:
                 - ReplicaSet
                 - ReplicationController
                 - Job
-              namespaces:
-                - quartz1
       validate:
-        message: "Workload pod templates must set effective runAsUser >= 1000 for all containers and initContainers."
+        message: >-
+          {{ request.object.kind }}/{{ request.object.metadata.name }} template:
+          container/initContainer '{{ element.name }}' has effective runAsUser
+          '{{ element.securityContext.runAsUser || request.object.spec.template.spec.securityContext.runAsUser || `unset` }}';
+          required: >= 1000.
         foreach:
           - list: "request.object.spec.template.spec.containers[]"
             deny:
@@ -84,10 +89,12 @@ spec:
           - resources:
               kinds:
                 - CronJob
-              namespaces:
-                - quartz1
       validate:
-        message: "CronJob pod templates must set effective runAsUser >= 1000 for all containers and initContainers."
+        message: >-
+          CronJob/{{ request.object.metadata.name }} template:
+          container/initContainer '{{ element.name }}' has effective runAsUser
+          '{{ element.securityContext.runAsUser || request.object.spec.jobTemplate.spec.template.spec.securityContext.runAsUser || `unset` }}';
+          required: >= 1000.
         foreach:
           - list: "request.object.spec.jobTemplate.spec.template.spec.containers[]"
             deny:
