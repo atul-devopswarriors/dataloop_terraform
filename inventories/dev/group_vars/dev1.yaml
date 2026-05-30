@@ -1,0 +1,9 @@
+---
+# Example namespace-specific overrides. This file is loaded automatically only
+# for hosts that belong to the dev1 inventory group.
+
+env: dev
+helm_namespace: dev1
+helm_release_name: web-dev1
+helm_values_file: "{{ helm_chart_dir }}/values.yaml"
+vault_password_file: /tmp/vault.txt

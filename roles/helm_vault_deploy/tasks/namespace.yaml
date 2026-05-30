@@ -1,0 +1,30 @@
+---
+- name: Render namespace manifest
+  ansible.builtin.command:
+    argv:
+      - "{{ kubectl_binary }}"
+      - create
+      - namespace
+      - "{{ helm_namespace }}"
+      - --dry-run=client
+      - -o
+      - yaml
+  register: helm_namespace_manifest
+  changed_when: false
+  when: helm_manage_namespace | bool
+  delegate_to: "{{ helm_delegate_to }}"
+
+- name: Ensure Helm namespace exists
+  ansible.builtin.command:
+    argv:
+      - "{{ kubectl_binary }}"
+      - apply
+      - -f
+      - -
+    stdin: "{{ helm_namespace_manifest.stdout }}"
+  register: helm_namespace_apply
+  changed_when: >-
+    ' created' in helm_namespace_apply.stdout
+    or ' configured' in helm_namespace_apply.stdout
+  when: helm_manage_namespace | bool
+  delegate_to: "{{ helm_delegate_to }}"

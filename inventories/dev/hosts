@@ -1,3 +1,5 @@
-[worker_node_group]
+[dev1]
 localhost ansible_connection=local
 
+[worker_node_group:children]
+dev1

@@ -1,0 +1,44 @@
+---
+- name: Validate required deployment inputs
+  ansible.builtin.assert:
+    that:
+      - env is defined
+      - env in allowed_envs
+      - helm_release_name | length > 0
+      - helm_namespace | length > 0
+      - helm_chart_dir | length > 0
+      - helm_values_file | length > 0
+      - vault_password_file | length > 0
+    fail_msg: >-
+      Required inputs are missing. Configure them in inventory group_vars or pass
+      them with -e. Required values include env, helm_release_name,
+      helm_namespace, helm_chart_dir, helm_values_file, and vault_password_file.
+  delegate_to: "{{ helm_delegate_to }}"
+
+- name: Check Helm chart directory
+  ansible.builtin.stat:
+    path: "{{ helm_chart_dir }}"
+  register: helm_chart_dir_stat
+  delegate_to: "{{ helm_delegate_to }}"
+
+- name: Fail when Helm chart directory does not exist
+  ansible.builtin.assert:
+    that:
+      - helm_chart_dir_stat.stat.exists
+      - helm_chart_dir_stat.stat.isdir
+    fail_msg: "Helm chart directory was not found: {{ helm_chart_dir }}"
+  delegate_to: "{{ helm_delegate_to }}"
+
+- name: Check Helm values file
+  ansible.builtin.stat:
+    path: "{{ helm_values_file }}"
+  register: helm_values_file_stat
+  delegate_to: "{{ helm_delegate_to }}"
+
+- name: Fail when Helm values file does not exist
+  ansible.builtin.assert:
+    that:
+      - helm_values_file_stat.stat.exists
+      - helm_values_file_stat.stat.isreg
+    fail_msg: "Helm values file was not found: {{ helm_values_file }}"
+  delegate_to: "{{ helm_delegate_to }}"

@@ -1,0 +1,62 @@
+---
+- name: Check configured certificate/key roots
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ helm_vault_cert_roots }}"
+  register: helm_vault_cert_root_stats
+  delegate_to: "{{ helm_delegate_to }}"
+
+- name: Find certificate/key files under existing roots
+  ansible.builtin.find:
+    paths: "{{ item.stat.path }}"
+    patterns: "{{ helm_vault_file_patterns }}"
+    recurse: true
+    file_type: file
+  loop: "{{ helm_vault_cert_root_stats.results | selectattr('stat.exists') | selectattr('stat.isdir') | list }}"
+  register: helm_vault_cert_find_results
+  delegate_to: "{{ helm_delegate_to }}"
+
+- name: Build list of certificate/key candidate files
+  ansible.builtin.set_fact:
+    helm_vault_candidate_files: >-
+      {{
+        helm_vault_cert_find_results.results
+        | default([])
+        | map(attribute='files')
+        | flatten
+        | map(attribute='path')
+        | unique
+        | sort
+        | list
+      }}
+
+- name: Detect files that are currently Ansible Vault encrypted
+  ansible.builtin.shell: |
+    set -euo pipefail
+    first_line=""
+    IFS= read -r first_line < "$TARGET_FILE" || true
+    case "$first_line" in
+      '$ANSIBLE_VAULT;'*) exit 0 ;;
+      *) exit 1 ;;
+    esac
+  args:
+    executable: /bin/bash
+  environment:
+    TARGET_FILE: "{{ item }}"
+  loop: "{{ helm_vault_candidate_files }}"
+  register: helm_vault_header_checks
+  changed_when: false
+  failed_when: helm_vault_header_checks.rc not in [0, 1]
+  no_log: true
+  delegate_to: "{{ helm_delegate_to }}"
+
+- name: Remember files that must be restored to encrypted state
+  ansible.builtin.set_fact:
+    helm_vault_encrypted_files: >-
+      {{
+        helm_vault_header_checks.results
+        | default([])
+        | selectattr('rc', 'equalto', 0)
+        | map(attribute='item')
+        | list
+      }}

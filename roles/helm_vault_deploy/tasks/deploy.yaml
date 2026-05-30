@@ -1,0 +1,85 @@
+---
+- name: Deploy release with decrypted certificate/key files
+  block:
+    - name: Decrypt certificate/key files before Helm deploy
+      ansible.builtin.command:
+        argv:
+          - ansible-vault
+          - decrypt
+          - --vault-password-file
+          - "{{ vault_password_file }}"
+          - "{{ item }}"
+      loop: "{{ helm_vault_encrypted_files }}"
+      no_log: true
+      delegate_to: "{{ helm_delegate_to }}"
+
+    - name: Run Helm upgrade/install
+      ansible.builtin.command:
+        argv: "{{ helm_command_argv }}"
+      vars:
+        helm_command_argv: >-
+          {{
+            [
+              helm_binary,
+              'upgrade',
+              '--install',
+              helm_release_name,
+              helm_chart_dir,
+              '--namespace',
+              helm_namespace,
+              '--values',
+              helm_values_file,
+              '--timeout',
+              helm_timeout
+            ]
+            + (helm_create_namespace | bool | ternary(['--create-namespace'], []))
+            + (helm_wait | bool | ternary(['--wait'], []))
+            + (helm_atomic | bool | ternary(['--atomic'], []))
+            + (((helm_extra_args | string | length) > 0) | ternary(helm_extra_args.split(), []))
+          }}
+      changed_when: true
+      delegate_to: "{{ helm_delegate_to }}"
+
+  always:
+    - name: Check which originally encrypted files are currently plaintext
+      ansible.builtin.shell: |
+        set -euo pipefail
+        first_line=""
+        IFS= read -r first_line < "$TARGET_FILE" || true
+        case "$first_line" in
+          '$ANSIBLE_VAULT;'*) exit 1 ;;
+          *) exit 0 ;;
+        esac
+      args:
+        executable: /bin/bash
+      environment:
+        TARGET_FILE: "{{ item }}"
+      loop: "{{ helm_vault_encrypted_files | default([]) }}"
+      register: helm_vault_plaintext_checks
+      changed_when: false
+      failed_when: helm_vault_plaintext_checks.rc not in [0, 1]
+      no_log: true
+      delegate_to: "{{ helm_delegate_to }}"
+
+    - name: Build re-encryption target list
+      ansible.builtin.set_fact:
+        helm_vault_reencrypt_files: >-
+          {{
+            helm_vault_plaintext_checks.results
+            | default([])
+            | selectattr('rc', 'equalto', 0)
+            | map(attribute='item')
+            | list
+          }}
+
+    - name: Re-encrypt certificate/key files after Helm deploy
+      ansible.builtin.command:
+        argv:
+          - ansible-vault
+          - encrypt
+          - --vault-password-file
+          - "{{ vault_password_file }}"
+          - "{{ item }}"
+      loop: "{{ helm_vault_reencrypt_files }}"
+      no_log: true
+      delegate_to: "{{ helm_delegate_to }}"

@@ -1,109 +1,170 @@
 # Helm deployment wrapper for Ansible Vault protected certs
 
-This wrapper deploys the existing `helm/web` chart while automating the
-certificate/private-key workflow:
+This wrapper deploys the existing `helm/web` chart through an Ansible role.
+It automates this workflow:
 
-1. Find files under:
-   - `helm/web/certs`
-   - `helm/web/multi-tenancy`
-2. Detect which files are currently encrypted with Ansible Vault.
-3. Decrypt only those files.
-4. Ensure the target Kubernetes namespace exists.
-5. Run `helm upgrade --install` with `--namespace` every time.
-6. Re-encrypt the originally encrypted files in an `always` section, even when
+1. Load Helm/chart settings from inventory vars.
+2. Find key/certificate files under configured chart directories.
+3. Detect which files are currently encrypted with Ansible Vault.
+4. Decrypt only those files.
+5. Ensure the target Kubernetes namespace exists.
+6. Run `helm upgrade --install` with `--namespace` every time.
+7. Re-encrypt the originally encrypted files in an `always` section, even when
    Helm fails.
 
-## Required command
+## Files added
 
-Ansible playbooks do not accept the Helm values file as a bare positional
-argument. Pass it as an extra variable:
-
-```bash
-ansible-playbook \
-  -i inventories/dev/hosts \
-  -l worker_node_group \
-  playbooks/master-helm.yaml \
-  -e env=dev \
-  -e helm_values_file=helm/web/values.yaml \
-  -e vault_password_file=/tmp/vault.txt \
-  --vault-password-file=/tmp/vault.txt
+```text
+ansible.cfg
+playbooks/master-helm.yaml
+roles/helm_vault_deploy/tasks/main.yaml
+roles/helm_vault_deploy/tasks/validate.yaml
+roles/helm_vault_deploy/tasks/namespace.yaml
+roles/helm_vault_deploy/tasks/vault-files.yaml
+roles/helm_vault_deploy/tasks/deploy.yaml
+inventories/dev/hosts
+inventories/dev/group_vars/all.yaml
+inventories/dev/group_vars/dev1.yaml
 ```
 
-For other environments:
+## Ansible role path
 
-```bash
-ansible-playbook \
-  -i inventories/qa/hosts \
-  -l worker_node_group \
-  playbooks/master-helm.yaml \
-  -e env=qa \
-  -e helm_values_file=helm/web/values-qa.yaml \
-  -e vault_password_file=/tmp/vault.txt \
-  --vault-password-file=/tmp/vault.txt
+`ansible.cfg` sets:
+
+```ini
+[defaults]
+roles_path = roles
 ```
 
-`--vault-password-file` lets Ansible read vaulted playbook variables if you use
-them. `vault_password_file` is passed to the `ansible-vault encrypt/decrypt`
-commands executed inside the playbook.
+Run the playbook from the repository root so Ansible can find the role and the
+relative chart paths.
 
-## Useful overrides
+## Minimal playbook
 
-The playbook defaults to:
+`playbooks/master-helm.yaml` only calls the role:
 
 ```yaml
+---
+- name: Deploy helm/web with Ansible Vault managed certificate files
+  hosts: all
+  gather_facts: false
+  run_once: true
+  any_errors_fatal: true
+
+  roles:
+    - helm_vault_deploy
+```
+
+## Where values come from
+
+Common/default values are loaded from:
+
+```text
+inventories/dev/group_vars/all.yaml
+```
+
+Important defaults in that file:
+
+```yaml
+env: dev
 helm_release_name: "web-{{ env }}"
 helm_namespace: "web-{{ env }}"
 helm_chart_dir: "{{ playbook_dir }}/../helm/web"
-kubectl_binary: kubectl
-helm_manage_namespace: true
-helm_wait: true
-helm_atomic: true
-helm_create_namespace: true
-helm_timeout: 10m
-helm_delegate_to: localhost
+helm_values_file: "{{ helm_chart_dir }}/values.yaml"
+vault_password_file: /tmp/vault.txt
+
+helm_vault_cert_roots:
+  - "{{ helm_chart_dir }}/certs"
+  - "{{ helm_chart_dir }}/multi-tenancy"
+helm_vault_file_patterns:
+  - "*.key"
+  - "*.pem"
 ```
 
-Override them as needed:
+The sample namespace-specific overrides for `dev1` are loaded from:
+
+```text
+inventories/dev/group_vars/dev1.yaml
+```
+
+That file sets:
+
+```yaml
+env: dev
+helm_namespace: dev1
+helm_release_name: web-dev1
+helm_values_file: "{{ helm_chart_dir }}/values.yaml"
+vault_password_file: /tmp/vault.txt
+```
+
+Because `inventories/dev/hosts` places `localhost` in the `dev1` group, Ansible
+automatically loads `group_vars/dev1.yaml` when you target `dev1`.
+
+## Deploy to namespace dev1
 
 ```bash
-ansible-playbook \
-  -i inventories/dev/hosts \
-  -l worker_node_group \
-  playbooks/master-helm.yaml \
-  -e env=dev \
-  -e helm_values_file=helm/web/values-dev.yaml \
-  -e vault_password_file=/tmp/vault.txt \
-  -e helm_release_name=web \
-  -e helm_namespace=web-dev \
-  --vault-password-file=/tmp/vault.txt
+ansible-playbook   -i inventories/dev/hosts   -l dev1   playbooks/master-helm.yaml   --vault-password-file=/tmp/vault.txt
 ```
 
-To deploy to a specific namespace, override `helm_namespace`:
+This uses:
+
+- chart: `helm/web`
+- values file: `helm/web/values.yaml`
+- namespace: `dev1`
+- release name: `web-dev1`
+- vault password file: `/tmp/vault.txt`
+
+Internally, the role runs the equivalent Helm command:
 
 ```bash
--e helm_namespace=my-web-namespace
+helm upgrade --install web-dev1 helm/web   --namespace dev1   --values helm/web/values.yaml   --timeout 10m   --create-namespace   --wait   --atomic
 ```
 
-With `helm_manage_namespace: true`, Ansible runs an idempotent namespace apply
-before Helm:
+## Deploy with a different values file
+
+Override just the values file at runtime:
 
 ```bash
-kubectl create namespace "$helm_namespace" --dry-run=client -o yaml | kubectl apply -f -
+ansible-playbook   -i inventories/dev/hosts   -l dev1   playbooks/master-helm.yaml   -e helm_values_file=helm/web/values-dev1.yaml   --vault-password-file=/tmp/vault.txt
 ```
 
-To pass additional Helm flags:
+## Deploy by passing all namespace settings at runtime
+
+If you do not want a `group_vars/dev1.yaml` file, use `group_vars/all.yaml` plus
+runtime overrides:
 
 ```bash
--e 'helm_extra_args=--set image.tag=1.2.3'
+ansible-playbook   -i inventories/dev/hosts   -l worker_node_group   playbooks/master-helm.yaml   -e env=dev   -e helm_namespace=dev1   -e helm_release_name=web-dev1   -e helm_values_file=helm/web/values.yaml   -e vault_password_file=/tmp/vault.txt   --vault-password-file=/tmp/vault.txt
 ```
 
-## Important notes
+## Restrict encryption/decryption to only `helm/web/certs/*.key`
 
-- Run this from the repository root so `helm/web` resolves correctly.
-- The machine selected by `helm_delegate_to` must have `helm`, `kubectl`,
-  `ansible-vault`, kubeconfig access, and filesystem access to `helm/web`.
-- The playbook only re-encrypts files that were Ansible Vault encrypted before
-  the Helm deployment started.
-- If you already decrypt manually and the files are plaintext before the
-  playbook starts, the wrapper will not encrypt them because it cannot know they
-  were meant to be restored.
+In `inventories/dev/group_vars/all.yaml`, use:
+
+```yaml
+helm_vault_cert_roots:
+  - "{{ helm_chart_dir }}/certs"
+helm_vault_file_patterns:
+  - "*.key"
+```
+
+## Required tools on the Ansible controller
+
+The machine selected by `helm_delegate_to` must have:
+
+- `ansible`
+- `ansible-vault`
+- `helm`
+- `kubectl`
+- kubeconfig access to the target cluster
+- filesystem access to `helm/web`
+
+## Important behavior
+
+- The role decrypts only files that already start with `$ANSIBLE_VAULT;`.
+- The role re-encrypts only files that were encrypted before the deployment
+  started.
+- If files are already plaintext before the role starts, the role will not
+  encrypt them because it cannot safely know they were meant to be restored.
+- Do not run raw `helm upgrade --install` directly if the chart still contains
+  vaulted key files. Run the Ansible playbook instead.

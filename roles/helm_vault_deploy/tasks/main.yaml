@@ -1,0 +1,12 @@
+---
+- name: Validate Helm vault deployment inputs
+  ansible.builtin.import_tasks: validate.yaml
+
+- name: Ensure target namespace is ready
+  ansible.builtin.import_tasks: namespace.yaml
+
+- name: Discover vaulted certificate/key files
+  ansible.builtin.import_tasks: vault-files.yaml
+
+- name: Decrypt files, run Helm, and restore encryption
+  ansible.builtin.import_tasks: deploy.yaml
