@@ -1,0 +1,9 @@
+---
+- name: Deploy helm/web with Ansible Vault managed certificate files
+  hosts: all
+  gather_facts: false
+  run_once: true
+  any_errors_fatal: true
+
+  roles:
+    - helm_vault_deploy

@@ -1,0 +1,36 @@
+---
+# Common values for deploying the helm/web chart through the helm_vault_deploy role.
+# Namespace/release-specific values can be overridden by a group_vars/<group>.yaml
+# file, by a vars file passed with -e @file.yaml, or by individual -e key=value args.
+
+env: dev
+allowed_envs:
+  - dev
+  - test
+  - qa
+
+helm_release_name: "web-{{ env }}"
+helm_namespace: "web-{{ env }}"
+helm_chart_dir: "{{ playbook_dir }}/../helm/web"
+helm_values_file: "{{ helm_chart_dir }}/values.yaml"
+
+helm_binary: helm
+kubectl_binary: kubectl
+helm_manage_namespace: true
+helm_wait: true
+helm_atomic: true
+helm_create_namespace: true
+helm_timeout: 10m
+helm_extra_args: ""
+
+# Files are decrypted only if they are already Ansible Vault encrypted.
+# Add/remove roots or patterns here to match your chart layout.
+helm_vault_cert_roots:
+  - "{{ helm_chart_dir }}/certs"
+  - "{{ helm_chart_dir }}/multi-tenancy"
+helm_vault_file_patterns:
+  - "*.key"
+  - "*.pem"
+
+vault_password_file: /tmp/vault.txt
+helm_delegate_to: localhost
