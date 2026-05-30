@@ -21,6 +21,8 @@
     helm_values_file: ""
 
     helm_binary: helm
+    kubectl_binary: kubectl
+    helm_manage_namespace: true
     helm_wait: true
     helm_atomic: true
     helm_create_namespace: true
@@ -45,6 +47,7 @@
         that:
           - env is defined
           - env in allowed_envs
+          - helm_namespace | length > 0
           - helm_values_file | length > 0
           - vault_password_file | length > 0
         fail_msg: >-
@@ -81,6 +84,37 @@
           - helm_values_file_stat.stat.isreg
         fail_msg: "Helm values file was not found: {{ helm_values_file }}"
       delegate_to: "{{ helm_delegate_to }}"
+
+    - name: Render namespace manifest
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_binary }}"
+          - create
+          - namespace
+          - "{{ helm_namespace }}"
+          - --dry-run=client
+          - -o
+          - yaml
+      register: helm_namespace_manifest
+      changed_when: false
+      when: helm_manage_namespace | bool
+      delegate_to: "{{ helm_delegate_to }}"
+
+    - name: Ensure Helm namespace exists
+      ansible.builtin.command:
+        argv:
+          - "{{ kubectl_binary }}"
+          - apply
+          - -f
+          - -
+        stdin: "{{ helm_namespace_manifest.stdout }}"
+      register: helm_namespace_apply
+      changed_when: >-
+        ' created' in helm_namespace_apply.stdout
+        or ' configured' in helm_namespace_apply.stdout
+      when: helm_manage_namespace | bool
+      delegate_to: "{{ helm_delegate_to }}"
+
 
     - name: Check configured certificate/key roots
       ansible.builtin.stat:

@@ -8,8 +8,9 @@ certificate/private-key workflow:
    - `helm/web/multi-tenancy`
 2. Detect which files are currently encrypted with Ansible Vault.
 3. Decrypt only those files.
-4. Run `helm upgrade --install`.
-5. Re-encrypt the originally encrypted files in an `always` section, even when
+4. Ensure the target Kubernetes namespace exists.
+5. Run `helm upgrade --install` with `--namespace` every time.
+6. Re-encrypt the originally encrypted files in an `always` section, even when
    Helm fails.
 
 ## Required command
@@ -53,6 +54,8 @@ The playbook defaults to:
 helm_release_name: "web-{{ env }}"
 helm_namespace: "web-{{ env }}"
 helm_chart_dir: "{{ playbook_dir }}/../helm/web"
+kubectl_binary: kubectl
+helm_manage_namespace: true
 helm_wait: true
 helm_atomic: true
 helm_create_namespace: true
@@ -75,6 +78,19 @@ ansible-playbook \
   --vault-password-file=/tmp/vault.txt
 ```
 
+To deploy to a specific namespace, override `helm_namespace`:
+
+```bash
+-e helm_namespace=my-web-namespace
+```
+
+With `helm_manage_namespace: true`, Ansible runs an idempotent namespace apply
+before Helm:
+
+```bash
+kubectl create namespace "$helm_namespace" --dry-run=client -o yaml | kubectl apply -f -
+```
+
 To pass additional Helm flags:
 
 ```bash
@@ -84,7 +100,7 @@ To pass additional Helm flags:
 ## Important notes
 
 - Run this from the repository root so `helm/web` resolves correctly.
-- The machine selected by `helm_delegate_to` must have `helm`,
+- The machine selected by `helm_delegate_to` must have `helm`, `kubectl`,
   `ansible-vault`, kubeconfig access, and filesystem access to `helm/web`.
 - The playbook only re-encrypts files that were Ansible Vault encrypted before
   the Helm deployment started.
